@@ -10,13 +10,16 @@
 #define NOT_IMPLEMENTED -1
 #define ERROR -2
 #define BOOT_SECTOR 0
-#define MFT_FIRST_SECTOR 4 //
+#define MFT_FIRST_SECTOR 4 
+#define MFT_ROOT_DIRECTORY_FIRST_SECTOR 6
+#define MTF_TUPLES_PER_RECORD 32
+#define MTF_RECORD_SIZE 512 //each MFT record consists of 32 tuples of 16 bytes
 #define MFT_LAST_SECTOR 8196 //2048 blocks * 4 sector per block + 4
 //16 bytes per tuple
 //32 tuples per sector (256/8)
-//64 tuples per block (16*4 sectors per block)
+//128 tuples per block (32*4 sectors per block)
 //blocks of 1KiB
-struct  t2fs_4tupla* reserved[4] ;
+struct  t2fs_4tupla** rootMTFRecord; //array of 32 tuples
 struct t2fs_bootBlock* block;
 BYTE buffer[SECTOR_SIZE] = {0};   
 
@@ -50,13 +53,21 @@ BYTE* dwordToBytes(DWORD dword) {
 * Assumes buffer already has the necessary content. 
 * REMEMBER to read_sector first!
 */
-struct t2fs_4tupla* readMFTrecord(int recordNumber) {
-    struct t2fs_4tupla* record = malloc(sizeof(*record));
-    int index = recordNumber*sizeof(*record);
-    record->atributeType = getDWord(buffer[index],buffer[index+1],buffer[index+2],buffer[index+3]);
-    record->virtualBlockNumber = getDWord(buffer[index+4],buffer[index+5],buffer[index+6],buffer[index+7]);
-    record->logicalBlockNumber = getDWord(buffer[index+8],buffer[index+9],buffer[index+10],buffer[index+11]);
-    record->numberOfContiguosBlocks = getDWord(buffer[index+12],buffer[index+13],buffer[index+14],buffer[index+15]);
+struct t2fs_4tupla* readMFTtuple(int tupleNumber) {
+    struct t2fs_4tupla* tuple = malloc(sizeof(*tuple));
+    int index = tupleNumber*sizeof(*tuple);
+    tuple->atributeType = getDWord(buffer[index],buffer[index+1],buffer[index+2],buffer[index+3]);
+    tuple->virtualBlockNumber = getDWord(buffer[index+4],buffer[index+5],buffer[index+6],buffer[index+7]);
+    tuple->logicalBlockNumber = getDWord(buffer[index+8],buffer[index+9],buffer[index+10],buffer[index+11]);
+    tuple->numberOfContiguosBlocks = getDWord(buffer[index+12],buffer[index+13],buffer[index+14],buffer[index+15]);
+    return tuple;
+}
+struct t2fs_4tupla** readMFTRecord() {
+    struct t2fs_4tupla** record = malloc(sizeof(*record)*MTF_TUPLES_PER_RECORD);
+    int i;
+    for(i = 0; i < MTF_TUPLES_PER_RECORD; i++) {
+        record[i] = readMFTtuple(i);
+    }
     return record;
 }
 struct t2fs_record* readFileRecord(int recordNumber) {
@@ -83,14 +94,13 @@ void writeMTFRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int s
     write_sector(sector, buffer);
 }
 void readReservedMFT() {
-    if(read_sector(MFT_FIRST_SECTOR, buffer) != 0) {
+    if(read_sector(MFT_ROOT_DIRECTORY_FIRST_SECTOR, buffer) != 0) {
         printf("Error reading MFT sector\n");
         return;
     }
-    //bitmap descriptor
-    reserved[0] = readMFTrecord(0); 
     //root directory descriptor
-    reserved[1] = readMFTrecord(1); 
+    rootMTFRecord = readMFTRecord(); 
+    /*
     if(reserved[1]->atributeType != 1) { //root directory wasn't created, so we must create it
         reserved[1]->atributeType = 1;
         reserved[1]->virtualBlockNumber = 0;
@@ -101,7 +111,7 @@ void readReservedMFT() {
         writeMTFRecord(reserved[1], 1, MFT_FIRST_SECTOR);
     } else {
         printf("Root was already created\n");
-    }
+    }*/
 
 }
 
@@ -130,18 +140,9 @@ void printMFTRecord(struct t2fs_4tupla* record) {
 }
 int main() {
     readBootBlock();
-    readReservedMFT();
-    // printf("%s\n", block->id);
-    // printf("%04x\n", block->version);
-    // printf("%04x\n", block->blockSize);
-    // printf("%04x\n", block->MFTBlocksSize);
-    // printf("%04x\n", block->diskSectorSize);
-    printf("Bitmap descriptor MTF: \n");
-    printMFTRecord(reserved[0]);
+    readReservedMFT();    
     printf("Root directory MTF: \n");
-    printMFTRecord(reserved[1]);    
-    // printf("%d\n", searchBitmap2(1));
-    // printf("%d\n", searchBitmap2(0));
+    printMFTRecord(rootMTFRecord[0]);    
     return 0;
 }
 
