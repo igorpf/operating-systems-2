@@ -17,12 +17,14 @@ TEST_DIR=./teste
 CFLAGS = -Wall
 all: directory main
 
-main: t2fs.o
-	$(CC) $(CFLAGS) -o $(BIN_DIR)/main $(LIB_DIR)/*.o $(BIN_DIR)/t2fs.o
+main: utils.o t2fs.o
+	$(CC) $(CFLAGS) -o $(BIN_DIR)/main $(LIB_DIR)/*.o $(BIN_DIR)/*.o
 directory:
 	mkdir -pv $(BIN_DIR) $(TEST_DIR) 
 t2fs.o: 
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/t2fs.c -o $(BIN_DIR)/t2fs.o 
+utils.o: 
+	$(CC) $(CFLAGS) -c $(SRC_DIR)/utils.c -o $(BIN_DIR)/utils.o 
 clean:
 	find $(BIN_DIR) $(LIB_DIR) -type f ! -name 'apidisk.o' ! -name 'bitmap2.o' ! -name '*.c' ! -name 'Makefile' -delete
 
