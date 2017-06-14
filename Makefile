@@ -13,12 +13,14 @@ LIB_DIR=./lib
 INC_DIR=./include
 BIN_DIR=./bin
 SRC_DIR=./src
+TEST_DIR=./teste
 CFLAGS = -Wall
-all: main
+all: directory main
 
 main: t2fs.o
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/main $(LIB_DIR)/*.o $(BIN_DIR)/t2fs.o
-
+directory:
+	mkdir -pv $(BIN_DIR) $(TEST_DIR) 
 t2fs.o: 
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/t2fs.c -o $(BIN_DIR)/t2fs.o 
 clean:
