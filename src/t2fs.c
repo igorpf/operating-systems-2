@@ -24,7 +24,7 @@ struct t2fs_bootBlock* block;
 BYTE buffer[SECTOR_SIZE] = {0};   
 
 //prototypes
-void printMFTRecord(struct t2fs_4tupla* record);
+void printMFTTuple(struct t2fs_4tupla* record);
 
 //------------Auxiliary functions--------------------------
 WORD getWord(char lsb, char msb) {
@@ -62,11 +62,22 @@ struct t2fs_4tupla* readMFTtuple(int tupleNumber) {
     tuple->numberOfContiguosBlocks = getDWord(buffer[index+12],buffer[index+13],buffer[index+14],buffer[index+15]);
     return tuple;
 }
-struct t2fs_4tupla** readMFTRecord() {
-    struct t2fs_4tupla** record = malloc(sizeof(*record)*MTF_TUPLES_PER_RECORD);
-    int i;
-    for(i = 0; i < MTF_TUPLES_PER_RECORD; i++) {
+struct t2fs_4tupla** readMFTRecord(int sector) {    
+    if(read_sector(sector, buffer) != 0) {
+        printf("Error reading sector for MFT record\n");
+    }
+    //A record is formed by two sectors, so they must be processed separately
+    struct t2fs_4tupla** record = malloc(sizeof(struct t2fs_4tupla)*MTF_TUPLES_PER_RECORD);
+    int i,j;
+    for(i = 0; i < MTF_TUPLES_PER_RECORD/2; i++) {
         record[i] = readMFTtuple(i);
+    }
+    if(read_sector(sector+1, buffer) != 0) {
+        printf("Error reading sector for MFT record\n");
+    }
+    for(j = 0; i < MTF_TUPLES_PER_RECORD; i++,j++) {
+        printf("i %d j %d\n", i,j);
+        record[i] = readMFTtuple(j);
     }
     return record;
 }
@@ -93,13 +104,9 @@ void writeMTFRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int s
     memcpy(buffer+index, dwordToBytes(record->numberOfContiguosBlocks), 4);
     write_sector(sector, buffer);
 }
-void readReservedMFT() {
-    if(read_sector(MFT_ROOT_DIRECTORY_FIRST_SECTOR, buffer) != 0) {
-        printf("Error reading MFT sector\n");
-        return;
-    }
+void readRootDirectoryRecord() {    
     //root directory descriptor
-    rootMTFRecord = readMFTRecord(); 
+    rootMTFRecord = readMFTRecord(MFT_ROOT_DIRECTORY_FIRST_SECTOR); 
     /*
     if(reserved[1]->atributeType != 1) { //root directory wasn't created, so we must create it
         reserved[1]->atributeType = 1;
@@ -131,18 +138,23 @@ void readBootBlock() {
     block->MFTBlocksSize = getWord(buffer[8],buffer[9]);
     block->diskSectorSize = getDWord(buffer[10],buffer[11],buffer[12],buffer[13]);
 }
-void printMFTRecord(struct t2fs_4tupla* record) {
-    printf("Record MTF: \n");
-    printf("Attribute type:              %04x hex %d dec\n", record->atributeType, record->atributeType);
-    printf("Virtual block number:        %04x hex %d dec\n", record->virtualBlockNumber, record->virtualBlockNumber);
-    printf("Logical block number:        %04x hex %d dec\n", record->logicalBlockNumber, record->logicalBlockNumber);
-    printf("Number of contiguous blocks: %04x hex %d dec\n", record->numberOfContiguosBlocks, record->numberOfContiguosBlocks);
+void printMFTTuple(struct t2fs_4tupla* tuple) {
+    printf("Tuple MTF: \n");
+    printf("Attribute type:              %04x hex %d dec\n", tuple->atributeType, tuple->atributeType);
+    printf("Virtual block number:        %04x hex %d dec\n", tuple->virtualBlockNumber, tuple->virtualBlockNumber);
+    printf("Logical block number:        %04x hex %d dec\n", tuple->logicalBlockNumber, tuple->logicalBlockNumber);
+    printf("Number of contiguous blocks: %04x hex %d dec\n", tuple->numberOfContiguosBlocks, tuple->numberOfContiguosBlocks);
 }
 int main() {
     readBootBlock();
-    readReservedMFT();    
+    readRootDirectoryRecord();    
     printf("Root directory MTF: \n");
-    printMFTRecord(rootMTFRecord[0]);    
+    int i;
+    for (i = 0; i < 32; ++i) {
+        printMFTTuple(rootMTFRecord[i]);
+    }
+    read_sector(rootMTFRecord[0]->logicalBlockNumber, buffer);
+    
     return 0;
 }
 
