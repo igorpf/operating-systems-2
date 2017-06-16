@@ -10,13 +10,24 @@
 #define BOOT_SECTOR 0
 #define MFT_FIRST_SECTOR 4 
 #define MFT_ROOT_DIRECTORY_FIRST_SECTOR 6
-#define MTF_TUPLES_PER_RECORD 32
-#define MTF_RECORD_SIZE 512 //each MFT record consists of 32 tuples of 16 bytes
+#define MFT_FIRST_VALID_SECTOR 12//first valid sector after reserved ones
+#define MFT_TUPLES_PER_RECORD 32
+#define MFT_RECORD_SIZE 512 //each MFT record consists of 32 tuples of 16 bytes
+#define SECTORS_PER_BLOCK 4
+#define FILE_RECORDS_PER_SECTOR 4
 #define MFT_LAST_SECTOR 8196 //2048 blocks * 4 sector per block + 4
+#define MAX_OPEN_FILES 20;
 
-extern struct  t2fs_4tupla** rootMTFRecord; //array of 32 tuples
+struct openFileRegister {
+    struct t2fs_record* fileRecord;
+    DWORD currentPointer;
+    FILE2 handle;    
+};
+
+extern struct  t2fs_4tupla** rootMFTRecord; //array of 32 tuples
 extern struct t2fs_bootBlock* block;
 extern BYTE buffer[SECTOR_SIZE];
+extern struct openFileRegister openFiles[MAX_OPEN_FILES];
 
 void printMFTTuple(struct t2fs_4tupla* record);
 WORD getWord(char lsb, char msb);
@@ -27,9 +38,11 @@ int blockToSector(int block);
 struct t2fs_4tupla* readMFTtuple(int tupleNumber);
 struct t2fs_4tupla** readMFTRecord(int sector);
 struct t2fs_record* readFileRecord(int recordNumber);
-void writeMTFRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int sector);
+void writeMFTRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int sector);
 void printFileRecord(struct t2fs_record* fileRecord);
 void readRootDirectoryRecord();
 void readBootBlock();
 void printMFTTuple(struct t2fs_4tupla* tuple);
+int strCount(const char* str, const char c);
+struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord); //
 #endif

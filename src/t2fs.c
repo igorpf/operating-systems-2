@@ -6,15 +6,26 @@
 #include "../include/apidisk.h"
 #include "../include/bitmap2.h"
 
+void clearMemory() {
+    int i;
+    for(i = 0; i < MFT_TUPLES_PER_RECORD; i++) {
+        free(rootMFTRecord[i]);
+        rootMFTRecord[i] = NULL;
+    }
+    free(rootMFTRecord);
+    rootMFTRecord = NULL;
+}
 int main() {
     readBootBlock();
     readRootDirectoryRecord();    
-    printf("Root directory MTF: \n");
-    read_sector(blockToSector(rootMTFRecord[0]->logicalBlockNumber), buffer);
-    printFileRecord(readFileRecord(0));
-    printFileRecord(readFileRecord(1));
-    printFileRecord(readFileRecord(2));    
-    printFileRecord(readFileRecord(3));
+    printf("Root directory MFT: \n");
+    read_sector(blockToSector(rootMFTRecord[0]->logicalBlockNumber), buffer);
+    // printf("%d",rootMFTRecord[0]->logicalBlockNumber);
+    // printFileRecord(readFileRecord(0));
+    char file[] = "/file1";
+    open2(file);
+
+    clearMemory();
     return 0;
 }
 
@@ -28,7 +39,57 @@ int identify2 (char *name, int size) {
 }
 FILE2 create2 (char *filename) {return NOT_IMPLEMENTED;}
 int delete2 (char *filename) {return NOT_IMPLEMENTED;}
-FILE2 open2 (char *filename) {return NOT_IMPLEMENTED;}
+inline struct t2fs_record* searchSector(int sector, char* filename) {
+    read_sector(sector,buffer);
+    int j;
+    for(j = 0; j < FILE_RECORDS_PER_SECTOR; j++) {
+        struct t2fs_record* fileRecord = readFileRecord(j);
+        if(strcmp(fileRecord->name,filename)==0) {
+            printFileRecord(fileRecord);
+            return fileRecord;
+        }
+        free(fileRecord);
+    }
+    return NULL;
+}
+FILE2 open2 (char *filename) {
+    /**
+        1 - Split filename into tokens
+        2 - take the first token and search inside root directory
+        3 - if there the current token is found
+        4   - if it has next token, is a directory (check if the found record actually is)
+        5        - goto 2 assuming current token = next token and search from the found directory
+        6    - else if it's a file, open it
+        7 - else return error
+    */
+    char *token, *name = strdup(filename); //copy the filename because strtok destroys the input
+    int levels = strCount(name, '/'), 
+        currentLevel = 0, 
+        currentSector = rootMFTRecord[0]->logicalBlockNumber,//start com the first sector from root directory
+        i;
+    for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
+        currentLevel++;
+        for(i = 0; i < SECTORS_PER_BLOCK;i++) {
+            struct t2fs_record* file = searchSector(blockToSector(currentSector+i), token);
+            if(file) {
+                if(file->TypeVal == TYPEVAL_REGULAR) {
+                    struct openFileRegister* reg = getNewFileRegister(file);
+                    return reg? reg->handle : ERROR;
+                }
+                else if(file->TypeVal == TYPEVAL_DIRETORIO) {
+                    //search recursively inside
+                }
+                else { //something is wrong with the file, return error
+                    printf("Trying to open something that's not a file or directory");
+                    return ERROR;
+                } 
+            }
+        }
+        
+    }    
+    return NOT_IMPLEMENTED;
+}
+
 int close2 (FILE2 handle){return NOT_IMPLEMENTED;}
 int read2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int write2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}

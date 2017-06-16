@@ -6,9 +6,10 @@
 #include "../include/apidisk.h"
 #include "../include/bitmap2.h"
 
-struct  t2fs_4tupla** rootMTFRecord; //array of 32 tuples
+struct  t2fs_4tupla** rootMFTRecord; //array of 32 tuples
 struct t2fs_bootBlock* block;
 BYTE buffer[SECTOR_SIZE] = {0};   
+struct openFileRegister openFiles[MAX_OPEN_FILES];
 
 //------------Auxiliary functions--------------------------
 WORD getWord(char lsb, char msb) {
@@ -54,15 +55,15 @@ struct t2fs_4tupla** readMFTRecord(int sector) {
         printf("Error reading sector for MFT record\n");
     }
     //A record is formed by two sectors, so they must be processed separately
-    struct t2fs_4tupla** record = malloc(sizeof(struct t2fs_4tupla)*MTF_TUPLES_PER_RECORD);
+    struct t2fs_4tupla** record = malloc(sizeof(struct t2fs_4tupla)*MFT_TUPLES_PER_RECORD);
     int i,j;
-    for(i = 0; i < MTF_TUPLES_PER_RECORD/2; i++) {
+    for(i = 0; i < MFT_TUPLES_PER_RECORD/2; i++) {
         record[i] = readMFTtuple(i);
     }
     if(read_sector(sector+1, buffer) != 0) {
         printf("Error reading sector for MFT record\n");
     }
-    for(j = 0; i < MTF_TUPLES_PER_RECORD; i++,j++) {
+    for(j = 0; i < MFT_TUPLES_PER_RECORD; i++,j++) {
         record[i] = readMFTtuple(j);
     }
     return record;
@@ -78,8 +79,7 @@ struct t2fs_record* readFileRecord(int recordNumber) {
     record->MFTNumber = getDWord(buffer[index+8],buffer[index+9],buffer[index+10],buffer[index+11]);
     return record;
 }
-
-void writeMTFRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int sector) {
+void writeMFTRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int sector) {
     int index = sizeof(*record) * recordNumber;
     memcpy(buffer+index, dwordToBytes(record->atributeType), 4);
     index+=4;
@@ -99,7 +99,7 @@ void printFileRecord(struct t2fs_record* fileRecord) {
 }
 void readRootDirectoryRecord() {    
     //root directory descriptor
-    rootMTFRecord = readMFTRecord(MFT_ROOT_DIRECTORY_FIRST_SECTOR); 
+    rootMFTRecord = readMFTRecord(MFT_ROOT_DIRECTORY_FIRST_SECTOR); 
 }
 
 void readBootBlock() {
@@ -118,9 +118,35 @@ void readBootBlock() {
     block->diskSectorSize = getDWord(buffer[10],buffer[11],buffer[12],buffer[13]);
 }
 void printMFTTuple(struct t2fs_4tupla* tuple) {
-    printf("Tuple MTF: \n");
+    printf("Tuple MFT: \n");
     printf("Attribute type:              %04x hex %d dec\n", tuple->atributeType, tuple->atributeType);
     printf("Virtual block number:        %04x hex %d dec\n", tuple->virtualBlockNumber, tuple->virtualBlockNumber);
     printf("Logical block number:        %04x hex %d dec\n", tuple->logicalBlockNumber, tuple->logicalBlockNumber);
     printf("Number of contiguous blocks: %04x hex %d dec\n", tuple->numberOfContiguosBlocks, tuple->numberOfContiguosBlocks);
+}
+int strCount(const char* str, const char c) {
+    int count = 0;
+    while(*str != '\0') {
+        if(*str++==c)
+            count++;
+    }
+    return count;
+}
+/**
+*    Checks if there is an empty entry in the openFiles array.
+*    returns a new register if there is, NULL otherwise
+*/
+struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord) {
+    int i;
+    for(i = 0; i < MAX_OPEN_FILES; i++) {
+        if(!openFiles[i]) { //free slot
+            openFiles[i] = malloc(sizeof(*openFiles[i]));
+            openFiles[i]->fileRecord = fileRecord;
+            openFiles[i]->currentPointer = 0;
+            openFiles[i]->handle = i;
+            return openFiles[i];
+        }
+    }
+    //open files limit exceeded
+    return NULL;
 }
