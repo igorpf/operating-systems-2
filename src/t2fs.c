@@ -78,11 +78,12 @@ int main() {
     read_sector(blockToSector(rootMFTRecord[0]->logicalBlockNumber), buffer);
     // printf("%d",rootMFTRecord[0]->logicalBlockNumber);
     // printFileRecord(readFileRecord(0));
-    char dir[] = "/file13", file[]="/file13/test.txt";
-    mkdir2(dir);
+    char dir[] = "/file13", file[]="/file13/test.txt", file2[]="/file13/text2.txt";
+    printf("mkdir %d\n",mkdir2(dir));
     FILE2 fhandle = create2(file);
     printf("\n File Handler:%i\n", fhandle);
-    close(fhandle);
+    close2(fhandle);
+    create2(file2);
     clearMemory();
     return 0;
 }
@@ -138,7 +139,7 @@ FILE2 create2 (char *filename) {
                     2 - create an open file record
                 */
                 struct t2fs_record* fileRecord = createFileRecord(TYPEVAL_REGULAR,token, getNewMFTRecord());
-                // printFileRecord(fileRecord);
+                printFileRecord(fileRecord);
                 writeFileRecord(currentBlock, fileRecord);
                 struct openFileRegister* fr = getNewFileRegister(fileRecord);
                 return fr? fr->handle:ERROR;

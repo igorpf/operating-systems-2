@@ -160,11 +160,13 @@ int strCount(const char* str, const char c) {
 *    returns a new register if there is, NULL otherwise
 */
 struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord) {
-    if(!openFiles) {
-        openFiles = malloc(sizeof(*openFiles) * MAX_OPEN_FILES);
-    }
     int i;
+    if(!openFiles) {
+        openFiles = malloc(sizeof(**openFiles) * MAX_OPEN_FILES);
+        for(i = 0; i < MAX_OPEN_FILES; i++) {openFiles[i]=NULL;}    
+    }
     for(i = 0; i < MAX_OPEN_FILES; i++) {
+        // printf("looking %d %d\n", i, !openFiles[i]);
         if(!openFiles[i]) { //free slot
             openFiles[i] = malloc(sizeof(*openFiles[i]));
             openFiles[i]->fileRecord = fileRecord;
