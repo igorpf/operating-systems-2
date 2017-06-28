@@ -214,3 +214,16 @@ int getNewMFTRecord() {
     }
     return ERROR;
 }
+
+int isValidFileName(char* filename){
+    int i;
+    for (i = 0; i < strlen(filename); i++){
+        if(!((filename[i] > 45 && filename[i] < 58) ||
+            (filename[i] > 65 && filename[i] < 91)||
+            (filename[i] > 96 && filename[i] < 123))){
+            printf("Invalid file name.");
+            return ERROR;
+        }   
+    }
+    return 0;
+}

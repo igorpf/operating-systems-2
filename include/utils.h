@@ -53,4 +53,5 @@ int strCount(const char* str, const char c);
 struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord); //
 int MFTRecordToSector(int recordNumber);
 int getNewMFTRecord();
+int isValidFileName(char* filename);
 #endif

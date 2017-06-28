@@ -94,6 +94,11 @@ int identify2 (char *name, int size) {
     return 0;
 }
 FILE2 create2 (char *filename) {
+
+	if(isValidFileName(filename) == ERROR){
+		return ERROR;
+	}
+
     char *token, *name = strdup(filename); //copy the filename because strtok destroys the input]
     struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
     int levels = strCount(name, '/'), 
