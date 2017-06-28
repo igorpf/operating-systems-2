@@ -18,10 +18,10 @@ void clearMemory() {
 inline struct t2fs_record* searchSector(int sector, char* filename) {
     read_sector(sector,buffer);
     int j;
-    for(j = 0; j < FILE_RECORDS_PER_SECTOR; j++) {
+    for(j = 0; j < FILE_RECORDS_PER_SECTOR; j++) {        
         struct t2fs_record* fileRecord = readFileRecord(j);
         if(strcmp(fileRecord->name,filename)==0) {
-            printFileRecord(fileRecord);
+            // printFileRecord(fileRecord);
             return fileRecord;
         }
         free(fileRecord);
@@ -39,13 +39,37 @@ inline struct t2fs_record* searchBlock(int block, char* filename) {
     }
     return NULL;
 }
-inline struct t2fs_record* createFileRecord(char* filename, int MFTNumber) {
+inline struct t2fs_record* createFileRecord(BYTE type, char* filename, int MFTNumber) {
     struct t2fs_record* record = malloc(sizeof(*record));
-    record->TypeVal = TYPEVAL_REGULAR;
-    strncpy(record->file, filename, MAX_FILE_NAME_SIZE);
-    record->blocksFileSize = 1;
+    record->TypeVal = type;
+    strncpy(record->name, filename, MAX_FILE_NAME_SIZE);
+    record->blocksFileSize = 1; //0??
     record->bytesFileSize = 0;
     record->MFTNumber = MFTNumber;
+    return record;
+}
+inline int writeFileRecord(int block, struct t2fs_record* record){
+    int i, j;
+    for(i = 0; i < SECTORS_PER_BLOCK;i++) {
+        int sector = blockToSector(block)+i; 
+        read_sector(sector,buffer);
+        for(j = 0; j < FILE_RECORDS_PER_SECTOR;j++) {
+            struct t2fs_record* fileRecord = readFileRecord(j);
+            // printFileRecord(fileRecord);
+            if(fileRecord->TypeVal != TYPEVAL_REGULAR && fileRecord->TypeVal != TYPEVAL_DIRETORIO) {                
+                int index = sizeof(*record)*j;
+                
+                buffer[index] = record->TypeVal;
+                memcpy(buffer+index+1, record->name, MAX_FILE_NAME_SIZE);
+                memcpy(buffer+index+1+MAX_FILE_NAME_SIZE, dwordToBytes(record->blocksFileSize), 4);
+                memcpy(buffer+index+5+MAX_FILE_NAME_SIZE, dwordToBytes(record->bytesFileSize), 4);
+                memcpy(buffer+index+9+MAX_FILE_NAME_SIZE, dwordToBytes(record->MFTNumber), 4);
+                write_sector(sector,buffer);
+                return SUCCESS;
+            }
+        }
+    }
+    return ERROR;
 }
 int main() {
     readBootBlock();
@@ -54,9 +78,9 @@ int main() {
     read_sector(blockToSector(rootMFTRecord[0]->logicalBlockNumber), buffer);
     // printf("%d",rootMFTRecord[0]->logicalBlockNumber);
     // printFileRecord(readFileRecord(0));
-    char file[] = "/file1";
+    char dir[] = "/file13", file[]="/file13/test.txt";
+    mkdir2(dir);
     create2(file);
-
     clearMemory();
     return 0;
 }
@@ -80,17 +104,20 @@ FILE2 create2 (char *filename) {
     for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
         currentLevel++;
         for(i=0,currentBlock = currentMFTRecord[i]->logicalBlockNumber;
-            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {
+            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {            
             //TODO: check for the possibility of having multiple mft records for one file
             struct t2fs_record* file = searchBlock(currentBlock, token);
             if(file) { 
-                if(file->TypeVal == TYPEVAL_REGULAR) {
+                if(file->TypeVal == TYPEVAL_REGULAR) {                    
                     //Trying to create an existing file
                     return ERROR;
                 }
                 else if(file->TypeVal == TYPEVAL_DIRETORIO) {
                     //search recursively inside
-                    currentMFTRecord = readMFTRecord(MFTRecordToSector(file->MFTNumber));
+                    // printFileRecord(file);
+                    currentMFTRecord = readMFTRecord(file->MFTNumber);
+                    // printMFTTuple(currentMFTRecord[0]);
+                    // printMFTTuple(currentMFTRecord[1]);
                     free(file);
                     break;
                 }
@@ -101,13 +128,13 @@ FILE2 create2 (char *filename) {
             } else if(currentLevel == levels) { // everything ok, the file can be created
                 /**
                 *   1 - Create MFT record
-                    2 - Allocate space
-                    3 - mark bitmap
-                    4 - create an open file record
+                    2 - create an open file record
                 */
-                int block = searchBitmap(FREE);
-                //setBitmap(block, ALLOCATED);
-                //
+                struct t2fs_record* fileRecord = createFileRecord(TYPEVAL_REGULAR,token, getNewMFTRecord());
+                // printFileRecord(fileRecord);
+                writeFileRecord(currentBlock, fileRecord);
+                struct openFileRegister* fr = getNewFileRegister(fileRecord);
+                return fr? fr->handle:ERROR;
             } else { //some directory in the path does not exist
                 return ERROR;
             }
@@ -172,7 +199,55 @@ int read2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int write2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int truncate2 (FILE2 handle){return NOT_IMPLEMENTED;}
 int seek2 (FILE2 handle, DWORD offset){return NOT_IMPLEMENTED;}
-int mkdir2 (char *pathname){return NOT_IMPLEMENTED;}
+int mkdir2 (char *pathname) {
+    char *token, *name = strdup(pathname); //copy the filename because strtok destroys the input]
+    struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
+    int levels = strCount(name, '/'), 
+        currentLevel = 0, 
+        currentBlock,
+        i;
+
+    for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
+        currentLevel++;
+        for(i=0,currentBlock = currentMFTRecord[i]->logicalBlockNumber;
+            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {
+            //TODO: check for the possibility of having multiple mft records for one file
+            struct t2fs_record* file = searchBlock(currentBlock, token);
+            if(file) { 
+                if(file->TypeVal == TYPEVAL_REGULAR) {                    
+                    //Trying to create an existing file
+                    return ERROR;
+                }
+                else if(file->TypeVal == TYPEVAL_DIRETORIO) {
+                    //search recursively inside
+                    currentMFTRecord = readMFTRecord(file->MFTNumber);
+                    free(file);
+                    break;
+                }
+                else { //something is wrong with the file, return error
+                    printf("Trying to open something that's not a file or directory");
+                    return ERROR;
+                } 
+            } else if(currentLevel == levels) { // everything ok, the directory can be created
+                /**
+                *   1 - Create MFT record
+                    2 - create an open file record
+                    3 - write record to current directory
+                */
+                struct t2fs_record* fileRecord = createFileRecord(TYPEVAL_DIRETORIO,token, getNewMFTRecord());
+                // printFileRecord(fileRecord);
+                writeFileRecord(currentBlock, fileRecord);
+                struct openFileRegister* fr = getNewFileRegister(fileRecord);
+                return fr? fr->handle:ERROR;
+            } else { //some directory in the path does not exist
+                return ERROR;
+            }
+
+        }
+    }    
+    /*Didn't find or tried to open directory as file*/
+    return ERROR;
+}
 int rmdir2 (char *pathname){return NOT_IMPLEMENTED;}
 DIR2 opendir2 (char *pathname){return NOT_IMPLEMENTED;}    
  int readdir2 (DIR2 handle, DIRENT2 *dentry){return NOT_IMPLEMENTED;}

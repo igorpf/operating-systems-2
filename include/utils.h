@@ -3,9 +3,14 @@
 
 #include "t2fs.h"
 
+#define MFT_FREE -1
+#define MFT_END 0
+#define MFT_TUPLE 1
+#define MFT_ADDITIONAL 2
 #define FREE 0
 #define ALLOCATED 1
 #define NOT_IMPLEMENTED -1
+#define SUCCESS 1
 #define ERROR -2
 #define BOOT_SECTOR 0
 #define MFT_FIRST_SECTOR 4 
@@ -16,6 +21,7 @@
 #define SECTORS_PER_BLOCK 4
 #define FILE_RECORDS_PER_SECTOR 4
 #define MFT_LAST_SECTOR 8196 //2048 blocks * 4 sector per block + 4
+#define MFT_RECORDS (MFT_LAST_SECTOR - MFT_FIRST_SECTOR)/2 //2 sectors per record
 #define MAX_OPEN_FILES 20
 
 struct openFileRegister {
@@ -38,7 +44,7 @@ int blockToSector(int block);
 struct t2fs_4tupla* readMFTtuple(int tupleNumber);
 struct t2fs_4tupla** readMFTRecord(int recordNumber);
 struct t2fs_record* readFileRecord(int recordNumber);
-void writeMFTRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int sector);
+void writeMFTRecord(struct t2fs_4tupla** record, int recordNumber);
 void printFileRecord(struct t2fs_record* fileRecord);
 void readRootDirectoryRecord();
 void readBootBlock();
@@ -46,4 +52,5 @@ void printMFTTuple(struct t2fs_4tupla* tuple);
 int strCount(const char* str, const char c);
 struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord); //
 int MFTRecordToSector(int recordNumber);
+int getNewMFTRecord();
 #endif

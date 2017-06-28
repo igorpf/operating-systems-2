@@ -80,17 +80,37 @@ struct t2fs_record* readFileRecord(int recordNumber) {
     record->MFTNumber = getDWord(buffer[index+8],buffer[index+9],buffer[index+10],buffer[index+11]);
     return record;
 }
-void writeMFTRecord(struct t2fs_4tupla* record, int recordNumber, unsigned int sector) {
-    int index = sizeof(*record) * recordNumber;
-    memcpy(buffer+index, dwordToBytes(record->atributeType), 4);
-    index+=4;
-    memcpy(buffer+index, dwordToBytes(record->virtualBlockNumber), 4);
-    index+=4;
-    memcpy(buffer+index, dwordToBytes(record->logicalBlockNumber), 4);
-    index+=4;
-    memcpy(buffer+index, dwordToBytes(record->numberOfContiguosBlocks), 4);
+
+void writeMFTRecord(struct t2fs_4tupla** record, int recordNumber) {
+    int i, j, sector;
+    for(i = 0; i < MFT_TUPLES_PER_RECORD/2; i++) {
+        int index = sizeof(*record[i]) * i;
+        memcpy(buffer+index, dwordToBytes(record[i]->atributeType), 4);
+        index+=4;
+        memcpy(buffer+index, dwordToBytes(record[i]->virtualBlockNumber), 4);
+        index+=4;
+        memcpy(buffer+index, dwordToBytes(record[i]->logicalBlockNumber), 4);
+        index+=4;
+        memcpy(buffer+index, dwordToBytes(record[i]->numberOfContiguosBlocks), 4);
+    }
+    sector = MFTRecordToSector(recordNumber);
+    // printf("Sector %d\n", sector);
     write_sector(sector, buffer);
+    for(i = MFT_TUPLES_PER_RECORD/2,j=0; i < MFT_TUPLES_PER_RECORD; i++,j++) {
+        int index = sizeof(*record[i]) * j;
+        memcpy(buffer+index, dwordToBytes(record[i]->atributeType), 4);
+        index+=4;
+        memcpy(buffer+index, dwordToBytes(record[i]->virtualBlockNumber), 4);
+        index+=4;
+        memcpy(buffer+index, dwordToBytes(record[i]->logicalBlockNumber), 4);
+        index+=4;
+        memcpy(buffer+index, dwordToBytes(record[i]->numberOfContiguosBlocks), 4);
+    }
+    write_sector(sector+1, buffer);
+    
+    
 }
+
 void printFileRecord(struct t2fs_record* fileRecord) {
     printf("TypeVal:        %d\n", fileRecord->TypeVal);
     printf("Name:           %s\n", fileRecord->name);
@@ -101,8 +121,8 @@ void printFileRecord(struct t2fs_record* fileRecord) {
 void readRootDirectoryRecord() {    
     //root directory descriptor
     rootMFTRecord = readMFTRecord(1); 
-    printMFTTuple(rootMFTRecord[0]);
-   printMFTTuple(rootMFTRecord[1]); 
+    // printMFTTuple(rootMFTRecord[0]);
+    // printMFTTuple(rootMFTRecord[1]); 
 }
 
 void readBootBlock() {
@@ -159,4 +179,38 @@ struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord) {
 int MFTRecordToSector(int recordNumber) {
     // return recordNumber * 2 + MFT_FIRST_VALID_SECTOR;
     return recordNumber * 2 + MFT_FIRST_SECTOR;
+}
+int getNewMFTRecord() {
+    int i,j, found = 0;
+    struct t2fs_4tupla** record;
+    for(i = 4; i < MFT_RECORDS; i++) {
+        record = readMFTRecord(i);
+        // printf("i: %d\n", i);
+        // printMFTTuple(record[0]);
+        // printMFTTuple(record[1]);
+        if(record[0]->atributeType == MFT_FREE) { //free record
+            found = 1;
+            int block = searchBitmap2(FREE);
+            // printf("bitmap %d\n", block);
+            setBitmap2(block, ALLOCATED);
+            record[0]->atributeType = MFT_TUPLE;
+            record[0]->virtualBlockNumber = 0;
+            record[0]->logicalBlockNumber = block;
+            record[0]->numberOfContiguosBlocks = 1;
+            record[1]->atributeType = MFT_END;
+            record[1]->virtualBlockNumber = 0;
+            record[1]->logicalBlockNumber = 0;
+            record[1]->numberOfContiguosBlocks = 0;
+            writeMFTRecord(record,i);
+        } 
+            
+        for(j = 0; j < MFT_TUPLES_PER_RECORD;j++) { //clear memory
+            if(record[j])
+                free(record[j]);
+        }
+        free(record);
+        if(found)
+            return i;
+    }
+    return ERROR;
 }
