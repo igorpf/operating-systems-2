@@ -221,9 +221,9 @@ int isValidFileName(char* filename){
         if(!((filename[i] > 45 && filename[i] < 58) ||
             (filename[i] > 65 && filename[i] < 91)||
             (filename[i] > 96 && filename[i] < 123))){
-            printf("Invalid file name.");
+            printf("\nInvalid file name.");
             return ERROR;
         }   
     }
-    return 0;
+    return SUCCESS;
 }

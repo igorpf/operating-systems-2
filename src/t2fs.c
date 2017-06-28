@@ -161,6 +161,11 @@ FILE2 open2 (char *filename) {
         6    - else if it's a file, open it
         7 - else return error
     */
+
+	if(isValidFileName(filename) == ERROR){
+		return ERROR;
+	}
+
     char *token, *name = strdup(filename); //copy the filename because strtok destroys the input
     int levels = strCount(name, '/'), 
         currentLevel = 0, 
@@ -205,6 +210,11 @@ int write2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int truncate2 (FILE2 handle){return NOT_IMPLEMENTED;}
 int seek2 (FILE2 handle, DWORD offset){return NOT_IMPLEMENTED;}
 int mkdir2 (char *pathname) {
+
+	if(isValidFileName(pathname) == ERROR){
+		return ERROR;
+	}
+
     char *token, *name = strdup(pathname); //copy the filename because strtok destroys the input]
     struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
     int levels = strCount(name, '/'), 
