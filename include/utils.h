@@ -54,4 +54,6 @@ struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord); //
 int MFTRecordToSector(int recordNumber);
 int getNewMFTRecord();
 int isValidFileName(char* filename);
+struct openFileRegister* getOpenFileRegisterByHandle(FILE2 handle);
+int removeFromOpenFiles(FILE2 handle);
 #endif

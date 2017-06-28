@@ -227,3 +227,23 @@ int isValidFileName(char* filename){
     }
     return SUCCESS;
 }
+
+struct openFileRegister* getOpenFileRegisterByHandle(FILE2 handle){
+
+    if(handle > MAX_OPEN_FILES || handle < 0)
+        return NULL;
+
+    return (struct openFileRegister *) openFiles[handle];
+}
+
+int removeFromOpenFiles(FILE2 handle){
+    int i;
+    for(i = 0; i < MAX_OPEN_FILES; i++) {
+        if(openFiles[i]->handle == handle) {
+            free(openFiles[i]);
+            openFiles[i] = NULL;
+            return SUCCESS;
+        }
+    }
+    return ERROR;
+}

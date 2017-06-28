@@ -80,7 +80,9 @@ int main() {
     // printFileRecord(readFileRecord(0));
     char dir[] = "/file13", file[]="/file13/test.txt";
     mkdir2(dir);
-    create2(file);
+    FILE2 fhandle = create2(file);
+    printf("\n File Handler:%i\n", fhandle);
+    close(fhandle);
     clearMemory();
     return 0;
 }
@@ -204,7 +206,20 @@ FILE2 open2 (char *filename) {
     return ERROR;
 }
 
-int close2 (FILE2 handle){return NOT_IMPLEMENTED;}
+int close2 (FILE2 handle){
+
+	struct openFileRegister *fileRegister;
+
+	fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
+
+	if(fileRegister->fileRecord->TypeVal != TYPEVAL_REGULAR){
+		printf("\nHandler is not a file type TYPEVAL_REGULAR\n");
+		return ERROR;
+	}
+
+	return removeFromOpenFiles(handle);
+}
+
 int read2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int write2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int truncate2 (FILE2 handle){return NOT_IMPLEMENTED;}
