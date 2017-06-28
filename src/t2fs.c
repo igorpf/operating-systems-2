@@ -74,16 +74,13 @@ inline int writeFileRecord(int block, struct t2fs_record* record){
 int main() {
     readBootBlock();
     readRootDirectoryRecord();    
-    printf("Root directory MFT: \n");
-    read_sector(blockToSector(rootMFTRecord[0]->logicalBlockNumber), buffer);
-    // printf("%d",rootMFTRecord[0]->logicalBlockNumber);
-    // printFileRecord(readFileRecord(0));
-    char dir[] = "/file13", file[]="/file13/test.txt", file2[]="/file13/text2.txt";
+    
+    char dir[] = "/file13", file[]="/file13/test.txt", file2[]="/file13/test.txt";
     printf("mkdir %d\n",mkdir2(dir));
     FILE2 fhandle = create2(file);
-    printf("\n File Handler:%i\n", fhandle);
-    close2(fhandle);
-    create2(file2);
+    printf("\nFile Handler:%i\n", fhandle);
+    printf("close %d\n",close2(fhandle));
+    printf("open file2 %d\n",open2(file2));
     clearMemory();
     return 0;
 }
@@ -98,9 +95,9 @@ int identify2 (char *name, int size) {
 }
 FILE2 create2 (char *filename) {
 
-	if(isValidFileName(filename) == ERROR){
-		return ERROR;
-	}
+    if(isValidFileName(filename) == ERROR){
+        return ERROR;
+    }
 
     char *token, *name = strdup(filename); //copy the filename because strtok destroys the input]
     struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
@@ -122,10 +119,7 @@ FILE2 create2 (char *filename) {
                 }
                 else if(file->TypeVal == TYPEVAL_DIRETORIO) {
                     //search recursively inside
-                    // printFileRecord(file);
                     currentMFTRecord = readMFTRecord(file->MFTNumber);
-                    // printMFTTuple(currentMFTRecord[0]);
-                    // printMFTTuple(currentMFTRecord[1]);
                     free(file);
                     break;
                 }
@@ -164,44 +158,45 @@ FILE2 open2 (char *filename) {
         6    - else if it's a file, open it
         7 - else return error
     */
+    if(isValidFileName(filename) == ERROR){
+        return ERROR;
+    }
 
-	if(isValidFileName(filename) == ERROR){
-		return ERROR;
-	}
-
-    char *token, *name = strdup(filename); //copy the filename because strtok destroys the input
+    char *token, *name = strdup(filename); //copy the filename because strtok destroys the input]
+    struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
     int levels = strCount(name, '/'), 
         currentLevel = 0, 
-        currentSector = rootMFTRecord[0]->logicalBlockNumber,//start com the first sector from root directory
+        currentBlock,
         i;
+
     for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
         currentLevel++;
-        for(i = 0; i < SECTORS_PER_BLOCK;i++) {
-            struct t2fs_record* file = searchSector(blockToSector(currentSector+i), token);
-            if(file) {
-                if(file->TypeVal == TYPEVAL_REGULAR) {
-                    // struct t2fs_4tupla **mftRecord = readMFTRecord(MFTRecordToSector(file->MFTNumber));
-                    // printMFTTuple(mftRecord[0]);
-                    struct openFileRegister* reg = getNewFileRegister(file);
-                    return reg? reg->handle : ERROR;
+        for(i=0,currentBlock = currentMFTRecord[i]->logicalBlockNumber;
+            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {            
+            //TODO: check for the possibility of having multiple mft records for one file
+            struct t2fs_record* file = searchBlock(currentBlock, token);
+            if(file) { 
+                if(file->TypeVal == TYPEVAL_REGULAR) {                    
+                    if(currentLevel < levels) //some directory in the path is actually a file. throw an error
+                        return ERROR;
+                    struct openFileRegister* fr = getNewFileRegister(file);
+                    return fr? fr->handle:ERROR;    
                 }
                 else if(file->TypeVal == TYPEVAL_DIRETORIO) {
                     //search recursively inside
-                    //
-                    struct t2fs_4tupla **mftRecord = readMFTRecord(MFTRecordToSector(file->MFTNumber));
-                    currentSector = blockToSector(mftRecord[0]->logicalBlockNumber);
-                    //TODO: search recursively mft tuples/records
-                    // printMFTTuple(mftRecord[0]);
+                    currentMFTRecord = readMFTRecord(file->MFTNumber);
+                    free(file);
                     break;
                 }
                 else { //something is wrong with the file, return error
                     printf("Trying to open something that's not a file or directory");
                     return ERROR;
                 } 
-            } else
-                break;
+            } else { //some directory in the path does not exist
+                return ERROR;
+            }
+
         }
-        
     }    
     /*Didn't find or tried to open directory as file*/
     return ERROR;
@@ -209,16 +204,16 @@ FILE2 open2 (char *filename) {
 
 int close2 (FILE2 handle){
 
-	struct openFileRegister *fileRegister;
+    struct openFileRegister *fileRegister;
 
-	fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
+    fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
 
-	if(fileRegister->fileRecord->TypeVal != TYPEVAL_REGULAR){
-		printf("\nHandler is not a file type TYPEVAL_REGULAR\n");
-		return ERROR;
-	}
+    if(fileRegister && fileRegister->fileRecord->TypeVal != TYPEVAL_REGULAR){
+        printf("\nHandler is not a file type TYPEVAL_REGULAR\n");
+        return ERROR;
+    }
 
-	return removeFromOpenFiles(handle);
+    return removeFromOpenFiles(handle);
 }
 
 int read2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
@@ -227,9 +222,9 @@ int truncate2 (FILE2 handle){return NOT_IMPLEMENTED;}
 int seek2 (FILE2 handle, DWORD offset){return NOT_IMPLEMENTED;}
 int mkdir2 (char *pathname) {
 
-	if(isValidFileName(pathname) == ERROR){
-		return ERROR;
-	}
+    if(isValidFileName(pathname) == ERROR){
+        return ERROR;
+    }
 
     char *token, *name = strdup(pathname); //copy the filename because strtok destroys the input]
     struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
