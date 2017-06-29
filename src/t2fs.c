@@ -76,10 +76,12 @@ int main() {
     readRootDirectoryRecord();    
     
     char dir[] = "/file13", file[]="/file13/test.txt", file2[]="/file13/test.txt";
-    printf("mkdir %d\n",mkdir2(dir));
+    DIR2 dirHandl = mkdir2(dir);
+    printf("mkdir %d\n", dirHandl);
+    printf("open dir %d\n", opendir2(dir));
     FILE2 fhandle = create2(file);
     printf("\nFile Handler:%i\n", fhandle);
-    printf("close %d\n",close2(fhandle));
+    printf("close file (handle: %d) %d\n", fhandle, close2(fhandle));
     printf("open file2 %d\n",open2(file2));
     clearMemory();
     return 0;
@@ -275,6 +277,53 @@ int mkdir2 (char *pathname) {
     return ERROR;
 }
 int rmdir2 (char *pathname){return NOT_IMPLEMENTED;}
-DIR2 opendir2 (char *pathname){return NOT_IMPLEMENTED;}    
+DIR2 opendir2 (char *pathname){
+
+    if(isValidFileName(pathname) == ERROR){
+        return ERROR;
+    }
+
+    char *token, *name = strdup(pathname); //copy the filename because strtok destroys the input]
+    struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
+    int levels = strCount(name, '/'), 
+        currentLevel = 0, 
+        currentBlock,
+        i;
+
+    for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
+        currentLevel++;
+        for(i=0,currentBlock = currentMFTRecord[i]->logicalBlockNumber;
+            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {            
+            //TODO: check for the possibility of having multiple mft records for one file
+            struct t2fs_record* file = searchBlock(currentBlock, token);
+            if(file) { 
+                if(file->TypeVal == TYPEVAL_REGULAR) {
+                		printf("\n[opendir2] Path leads to a file, not a directory\n");                    
+                        return ERROR;
+                }
+                else if(file->TypeVal == TYPEVAL_DIRETORIO) {
+                    if(currentLevel == levels){ //its a directory and is the last level -> it's this one we should open
+	                    struct openFileRegister* fr = getNewFileRegister(file);
+    	                return fr? fr->handle:ERROR;
+                    }
+
+                    //or search recursively inside
+                    currentMFTRecord = readMFTRecord(file->MFTNumber);
+                    free(file);
+                    break;
+                }
+                else { //something is wrong with the file, return error
+                    printf("Trying to open something that's not a file or directory");
+                    return ERROR;
+                } 
+            } else { //some directory in the path does not exist
+                return ERROR;
+            }
+
+        }
+    }    
+    return ERROR;
+}
+
  int readdir2 (DIR2 handle, DIRENT2 *dentry){return NOT_IMPLEMENTED;}
 int closedir2 (DIR2 handle){return NOT_IMPLEMENTED;}
