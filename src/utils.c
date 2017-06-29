@@ -232,7 +232,7 @@ int isValidFileName(char* filename){
 
 struct openFileRegister* getOpenFileRegisterByHandle(FILE2 handle){
 
-    if(handle > MAX_OPEN_FILES || handle < 0)
+    if(handle >= MAX_OPEN_FILES || handle < 0)
         return NULL;
 
     return (struct openFileRegister *) openFiles[handle];
