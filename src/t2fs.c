@@ -79,6 +79,7 @@ int main() {
     DIR2 dirHandl = mkdir2(dir);
     printf("mkdir %d\n", dirHandl);
     printf("open dir %d\n", opendir2(dir));
+    printf("close dir (handle: %d) %d\n", dirHandl, closedir2(dirHandl));
     FILE2 fhandle = create2(file);
     printf("\nFile Handler:%i\n", fhandle);
     printf("close file (handle: %d) %d\n", fhandle, close2(fhandle));
@@ -211,7 +212,7 @@ int close2 (FILE2 handle){
     fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
 
     if(fileRegister && fileRegister->fileRecord->TypeVal != TYPEVAL_REGULAR){
-        printf("\nHandler is not a file type TYPEVAL_REGULAR\n");
+        printf("\n[Close2] Handler is not a file type TYPEVAL_REGULAR\n");
         return ERROR;
     }
 
@@ -276,7 +277,9 @@ int mkdir2 (char *pathname) {
     /*Didn't find or tried to open directory as file*/
     return ERROR;
 }
+
 int rmdir2 (char *pathname){return NOT_IMPLEMENTED;}
+
 DIR2 opendir2 (char *pathname){
 
     if(isValidFileName(pathname) == ERROR){
@@ -326,4 +329,17 @@ DIR2 opendir2 (char *pathname){
 }
 
  int readdir2 (DIR2 handle, DIRENT2 *dentry){return NOT_IMPLEMENTED;}
-int closedir2 (DIR2 handle){return NOT_IMPLEMENTED;}
+int closedir2 (DIR2 handle){
+
+    struct openFileRegister *fileRegister;
+
+    fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
+
+    if(fileRegister && fileRegister->fileRecord->TypeVal != TYPEVAL_DIRETORIO){
+        printf("\n[Close2] Handler is not a file type TYPEVAL_DIRETORIO\n");
+        return ERROR;
+    }
+
+    return removeFromOpenFiles(handle);
+
+}
