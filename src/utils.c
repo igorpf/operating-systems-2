@@ -249,3 +249,42 @@ int removeFromOpenFiles(FILE2 handle){
     }
     return ERROR;
 }
+
+int deallocateBlocksFromMFT(int MFT_Number){
+
+    struct t2fs_4tupla** record;
+    record = readMFTRecord(MFT_Number);
+    int i = 0, erro = 0;
+
+    while(record[i]->atributeType != MFT_END){
+
+        int blockNumber = 0;
+        for(blockNumber = record[i]->logicalBlockNumber; blockNumber < record[i]->numberOfContiguosBlocks; blockNumber++){
+            if(!setBitmap2(blockNumber, FREE))
+                erro = erro + 1;
+        }
+
+        if(record[i]->atributeType == MFT_ADDITIONAL){
+            record = readMFTRecord(record[i]->virtualBlockNumber);
+            i = 0;
+            break;
+            /*Isso aqui 'e pra tentar garantir o funcionamento
+             mesmo quando o arq precisa de mais de um reg MFT */
+        }
+        i++;
+    }
+
+    if(!erro)
+        return SUCCESS;
+    else
+        return ERROR;
+
+}
+
+int setAsFreeMFT(int MFT_Number){
+    struct t2fs_4tupla** record;
+    record = readMFTRecord(MFT_Number);
+    
+    record[0]->atributeType = MFT_FREE;
+    return SUCCESS;
+}

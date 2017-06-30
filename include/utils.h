@@ -56,4 +56,6 @@ int getNewMFTRecord();
 int isValidFileName(char* filename);
 struct openFileRegister* getOpenFileRegisterByHandle(FILE2 handle);
 int removeFromOpenFiles(FILE2 handle);
+int deallocateBlocksFromMFT(int MFT_Number);
+int setAsFreeMFT(int MFT_Number);
 #endif

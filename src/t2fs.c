@@ -75,15 +75,34 @@ int main() {
     readBootBlock();
     readRootDirectoryRecord();    
     
-    char dir[] = "/file13", file[]="/file13/test.txt", file2[]="/file13/test.txt";
+    char dir[] = "/file13", file[]="/file13/test2.txt", file2[]="/file13/test3.txt";
+    
+
+    printf("------- TESTING CREATING DIR\n");
+
     DIR2 dirHandl = mkdir2(dir);
     printf("mkdir %d\n", dirHandl);
     printf("open dir %d\n", opendir2(dir));
     printf("close dir (handle: %d) %d\n", dirHandl, closedir2(dirHandl));
+
+    
+    printf("\n\n------- TESTING CREATING FILE\n");
+
+    printf("Trying to delete file before creating, should return ERROR: %d\n",delete2(file));
+
     FILE2 fhandle = create2(file);
     printf("\nFile Handler:%i\n", fhandle);
     printf("close file (handle: %d) %d\n", fhandle, close2(fhandle));
-    printf("open file2 %d\n",open2(file2));
+
+    printf("Trying to delete file, should return SUCCESS: %d\n",delete2(file));
+
+    
+    printf("\n\n------- TESTING CREATING SECOND FILE\n");
+
+    FILE2 f2handle = create2(file2);
+    printf("\nFile 2 Handler:%i\n", f2handle);
+
+    //printf("open file2 %d\n",open2(file2));
     clearMemory();
     return 0;
 }
@@ -149,7 +168,53 @@ FILE2 create2 (char *filename) {
     /*Didn't find or tried to open directory as file*/
     return ERROR;
 }
-int delete2 (char *filename) {return NOT_IMPLEMENTED;}
+int delete2 (char *filename) {
+
+    if(isValidFileName(filename) == ERROR){
+        return ERROR;
+    }
+
+    char *token, *name = strdup(filename); //copy the filename because strtok destroys the input]
+    struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
+    int levels = strCount(name, '/'), 
+        currentLevel = 0, 
+        currentBlock,
+        i;
+
+    for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
+        currentLevel++;
+        for(i=0,currentBlock = currentMFTRecord[i]->logicalBlockNumber;
+            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {            
+            //TODO: check for the possibility of having multiple mft records for one file
+            struct t2fs_record* file = searchBlock(currentBlock, token);
+            if(file) { 
+                if(file->TypeVal == TYPEVAL_REGULAR) {                    
+                    if(currentLevel < levels) //some directory in the path is actually a file. throw an error
+                        return ERROR;
+                    if(deallocateBlocksFromMFT(file->MFTNumber) == SUCCESS)
+                        return setAsFreeMFT(file->MFTNumber);    
+                    else
+                        return ERROR;
+                }
+                else if(file->TypeVal == TYPEVAL_DIRETORIO) {
+                    //search recursively inside
+                    currentMFTRecord = readMFTRecord(file->MFTNumber);
+                    free(file);
+                    break;
+                }
+                else { //something is wrong with the file, return error
+                    //printf("Trying to open something that's not a file or directory");
+                    return ERROR;
+                } 
+            } else { //some directory in the path does not exist
+                return ERROR;
+            }
+
+        }
+    }
+
+    return ERROR;
+}
 
 FILE2 open2 (char *filename) {
     /**
