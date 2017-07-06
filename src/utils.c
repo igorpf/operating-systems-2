@@ -262,15 +262,17 @@ int deallocateBlocksFromMFT(int MFT_Number){
         for(blockNumber = record[i]->logicalBlockNumber; blockNumber < record[i]->numberOfContiguosBlocks; blockNumber++){
             if(!setBitmap2(blockNumber, FREE))
                 erro = erro + 1;
+            printf("Limpando os blocos do registro %d do MFT, erros: %d\n", MFT_Number, erro);
         }
 
         if(record[i]->atributeType == MFT_ADDITIONAL){
             record = readMFTRecord(record[i]->virtualBlockNumber);
             i = 0;
-            break;
+            continue;
             /*Isso aqui 'e pra tentar garantir o funcionamento
              mesmo quando o arq precisa de mais de um reg MFT */
         }
+
         i++;
     }
 
@@ -286,5 +288,11 @@ int setAsFreeMFT(int MFT_Number){
     record = readMFTRecord(MFT_Number);
     
     record[0]->atributeType = MFT_FREE;
+    record[0]->virtualBlockNumber = MFT_FREE;
+    record[0]->logicalBlockNumber = MFT_FREE;
+    record[0]->numberOfContiguosBlocks = MFT_FREE;
+    writeMFTRecord(record, MFT_Number);
+    // printMFTTuple(readMFTRecord(MFT_Number)[0]);
     return SUCCESS;
 }
+

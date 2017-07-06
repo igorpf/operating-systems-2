@@ -39,6 +39,34 @@ inline struct t2fs_record* searchBlock(int block, char* filename) {
     }
     return NULL;
 }
+
+inline int deleteFileRecord(int block, char* filename) {    
+    int i, j, baseSector = blockToSector(block);
+    for(i = 0; i < SECTORS_PER_BLOCK; i++) {
+        read_sector(baseSector+i,buffer);
+        for(j = 0; j < FILE_RECORDS_PER_SECTOR; j++) {
+            struct t2fs_record* fileRecord = readFileRecord(j);
+            if(strcmp(fileRecord->name,filename)==0) {
+                fileRecord->TypeVal = TYPEVAL_INVALIDO;                
+                strcpy(fileRecord->name,"");
+                fileRecord->blocksFileSize = 0;
+                fileRecord->bytesFileSize = 0;
+                fileRecord->MFTNumber = 0;
+                buffer[j] = fileRecord->TypeVal;
+                memcpy(buffer+j+1, fileRecord->name, MAX_FILE_NAME_SIZE);
+                memcpy(buffer+j+1+MAX_FILE_NAME_SIZE, dwordToBytes(fileRecord->blocksFileSize), 4);
+                memcpy(buffer+j+5+MAX_FILE_NAME_SIZE, dwordToBytes(fileRecord->bytesFileSize), 4);
+                memcpy(buffer+j+9+MAX_FILE_NAME_SIZE, dwordToBytes(fileRecord->MFTNumber), 4);
+                write_sector(baseSector+i,buffer);
+                // printFileRecord(fileRecord);
+                return SUCCESS;
+            }
+        free(fileRecord);
+        }        
+    }
+    return ERROR;
+}
+
 inline struct t2fs_record* createFileRecord(BYTE type, char* filename, int MFTNumber) {
     struct t2fs_record* record = malloc(sizeof(*record));
     record->TypeVal = type;
@@ -191,8 +219,10 @@ int delete2 (char *filename) {
                 if(file->TypeVal == TYPEVAL_REGULAR) {                    
                     if(currentLevel < levels) //some directory in the path is actually a file. throw an error
                         return ERROR;
-                    if(deallocateBlocksFromMFT(file->MFTNumber) == SUCCESS)
+                    if(deallocateBlocksFromMFT(file->MFTNumber) == SUCCESS){
+                        deleteFileRecord(currentBlock, token);
                         return setAsFreeMFT(file->MFTNumber);    
+                    }
                     else
                         return ERROR;
                 }
