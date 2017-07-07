@@ -171,6 +171,7 @@ struct openFileRegister* getNewFileRegister(struct t2fs_record* fileRecord) {
             openFiles[i] = malloc(sizeof(*openFiles[i]));
             openFiles[i]->fileRecord = fileRecord;
             openFiles[i]->currentPointer = 0;
+            openFiles[i]->currentEntry = 0;
             openFiles[i]->handle = i;
             return openFiles[i];
         }
@@ -258,11 +259,11 @@ int deallocateBlocksFromMFT(int MFT_Number){
 
     while(record[i]->atributeType != MFT_END){
 
-        int blockNumber = 0;
-        for(blockNumber = record[i]->logicalBlockNumber; blockNumber < record[i]->numberOfContiguosBlocks; blockNumber++){
-            if(!setBitmap2(blockNumber, FREE))
+        int blockNumber = 0, limit;        
+        for(blockNumber = record[i]->logicalBlockNumber, limit = blockNumber + record[i]->numberOfContiguosBlocks; blockNumber < limit; blockNumber++){
+            if(setBitmap2(blockNumber, FREE) != 0)
                 erro = erro + 1;
-            printf("Limpando os blocos do registro %d do MFT, erros: %d\n", MFT_Number, erro);
+            printf("Limpando os bloco %d do registro %d do MFT, erros: %d\n", blockToSector,MFT_Number, erro);
         }
 
         if(record[i]->atributeType == MFT_ADDITIONAL){

@@ -111,7 +111,8 @@ int main() {
     DIR2 dirHandl = mkdir2(dir);
     printf("mkdir %d\n", dirHandl);
     printf("open dir %d\n", opendir2(dir));
-    printf("close dir (handle: %d) %d\n", dirHandl, closedir2(dirHandl));
+
+    // printf("close dir (handle: %d) %d\n", dirHandl, closedir2(dirHandl));
 
     
     printf("\n\n------- TESTING CREATING FILE\n");
@@ -129,8 +130,8 @@ int main() {
 
     FILE2 f2handle = create2(file2);
     printf("\nFile 2 Handler:%i\n", f2handle);
-
-    //printf("open file2 %d\n",open2(file2));
+    
+    printf("readdir2: %d\n", readdir2(dirHandl,NULL));
     clearMemory();
     return 0;
 }
@@ -423,7 +424,35 @@ DIR2 opendir2 (char *pathname){
     return ERROR;
 }
 
- int readdir2 (DIR2 handle, DIRENT2 *dentry){return NOT_IMPLEMENTED;}
+int readdir2 (DIR2 handle, DIRENT2 *dentry) {
+    int currentBlock,
+        blockLimit,
+        i;
+
+    struct openFileRegister* dir = getOpenFileRegisterByHandle(handle);
+    if(!dir){
+        return ERROR;
+    }
+    struct t2fs_4tupla ** currentMFTRecord = readMFTRecord(dir->fileRecord->MFTNumber);
+    // printMFTTuple(currentMFTRecord[0]);
+    
+    for(i=0;currentMFTRecord[i]->atributeType == 1;i++) {
+        for(currentBlock = currentMFTRecord[i]->logicalBlockNumber, blockLimit = currentMFTRecord[i]->logicalBlockNumber + currentMFTRecord[i]->numberOfContiguosBlocks; 
+            currentBlock < blockLimit; currentBlock++) {
+            // TODO: check for the possibility of having multiple mft records for one file
+            // struct t2fs_record* file = searchBlock(currentBlock, token);
+            // if(file) {
+                
+            // } 
+            // else { //end of dir
+            //     return END_OF_DIR;
+            // }
+        }
+    }
+      
+    /*Didn't find or tried to open directory as file*/
+    return ERROR;
+ }
 int closedir2 (DIR2 handle){
 
     struct openFileRegister *fileRegister;
@@ -436,5 +465,6 @@ int closedir2 (DIR2 handle){
     }
 
     return removeFromOpenFiles(handle);
-
 }
+//return different codes for end of dir, not found in block
+inline int getDirEntry(struct openFileRegister* dir, DIRENT2 *dentry) {}

@@ -26,7 +26,8 @@
 
 struct openFileRegister {
     struct t2fs_record* fileRecord;
-    DWORD currentPointer;
+    DWORD currentPointer; //used for files
+    DWORD currentEntry;   //used for keeping the last entry read
     FILE2 handle;    
 };
 
