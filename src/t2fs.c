@@ -131,6 +131,8 @@ int main() {
     FILE2 f2handle = create2(file2);
     printf("\nFile 2 Handler:%i\n", f2handle);
     
+
+    printf("Removing dir %s, should return SUCCESS: %d\n", dir, rmdir2(dir));
     printf("readdir2: %d\n", readdir2(dirHandl,NULL));
     clearMemory();
     return 0;
@@ -374,7 +376,59 @@ int mkdir2 (char *pathname) {
     return ERROR;
 }
 
-int rmdir2 (char *pathname){return NOT_IMPLEMENTED;}
+int rmdir2 (char *pathname){
+
+
+    if(isValidFileName(pathname) == ERROR){
+        return ERROR;
+    }
+
+    char *token, *name = strdup(pathname); //copy the filename because strtok destroys the input]
+    struct t2fs_4tupla ** currentMFTRecord = rootMFTRecord;
+    int levels = strCount(name, '/'), 
+        currentLevel = 0, 
+        currentBlock,
+        i;
+
+    for(token = strtok(name, "/");token != NULL; token=strtok(NULL, "/")) {
+        currentLevel++;
+        for(i=0,currentBlock = currentMFTRecord[i]->logicalBlockNumber;
+            currentMFTRecord[i]->atributeType == 1;i++, currentBlock = currentMFTRecord[i]->logicalBlockNumber) {            
+            //TODO: check for the possibility of having multiple mft records for one file
+            struct t2fs_record* file = searchBlock(currentBlock, token);
+            if(file) { 
+                if(file->TypeVal == TYPEVAL_REGULAR) {
+                        printf("\n[rmdir2] Path leads to a file, not a directory\n");                    
+                        return ERROR;
+                }
+                else if(file->TypeVal == TYPEVAL_DIRETORIO) {
+                    if(currentLevel == levels){ //its a directory and is the last level -> it's this one we should REMOVE
+                        /*Before deallocate dirs data, delete it's chidlren data*/
+
+
+                        if(deallocateBlocksFromMFT(file->MFTNumber) == SUCCESS){
+                            deleteFileRecord(currentBlock, token);
+                            return setAsFreeMFT(file->MFTNumber);    
+                        }
+                    }
+
+                    //or search recursively inside
+                    currentMFTRecord = readMFTRecord(file->MFTNumber);
+                    free(file);
+                    break;
+                }
+                else { //something is wrong with the file, return error
+                    printf("Trying to REMOVE something that's not a file or directory");
+                    return ERROR;
+                } 
+            } else { //some directory in the path does not exist
+                return ERROR;
+            }
+
+        }
+    }    
+    return ERROR;
+}
 
 DIR2 opendir2 (char *pathname){
 
