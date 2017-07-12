@@ -1,1 +1,1 @@
-cp ../t2fs_disk.dat . && clear && make && ./bin/main 
+cp ../t2fs_disk.dat . 

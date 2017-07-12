@@ -6,6 +6,7 @@
 #include "../include/apidisk.h"
 #include "../include/bitmap2.h"
 
+int initialized = 0;
 void clearMemory() {
     int i;
     for(i = 0; i < MFT_TUPLES_PER_RECORD; i++) {
@@ -99,43 +100,11 @@ inline int writeFileRecord(int block, struct t2fs_record* record){
     }
     return ERROR;
 }
-int main() {
+void init() {
+    // printf("init\n");
     readBootBlock();
-    readRootDirectoryRecord();    
-    
-    char dir[] = "/file13", file[]="/file13/test2.txt", file2[]="/file13/test3.txt";
-    
-
-    printf("------- TESTING CREATING DIR\n");
-
-    DIR2 dirHandl = mkdir2(dir);
-    printf("mkdir %d\n", dirHandl);
-    printf("open dir %d\n", opendir2(dir));
-
-    // printf("close dir (handle: %d) %d\n", dirHandl, closedir2(dirHandl));
-
-    
-    printf("\n\n------- TESTING CREATING FILE\n");
-
-    printf("Trying to delete file before creating, should return ERROR: %d\n",delete2(file));
-
-    FILE2 fhandle = create2(file);
-    printf("\nFile Handler:%i\n", fhandle);
-    printf("close file (handle: %d) %d\n", fhandle, close2(fhandle));
-
-    printf("Trying to delete file, should return SUCCESS: %d\n",delete2(file));
-
-    
-    printf("\n\n------- TESTING CREATING SECOND FILE\n");
-
-    FILE2 f2handle = create2(file2);
-    printf("\nFile 2 Handler:%i\n", f2handle);
-    
-
-    printf("Removing dir %s, should return SUCCESS: %d\n", dir, rmdir2(dir));
-    printf("readdir2: %d\n", readdir2(dirHandl,NULL));
-    clearMemory();
-    return 0;
+    readRootDirectoryRecord();
+    initialized = 1;
 }
 
 int identify2 (char *name, int size) {
@@ -147,7 +116,8 @@ int identify2 (char *name, int size) {
     return 0;
 }
 FILE2 create2 (char *filename) {
-
+    if(!initialized)
+        init();
     if(isValidFileName(filename) == ERROR){
         return ERROR;
     }
@@ -186,7 +156,7 @@ FILE2 create2 (char *filename) {
                     2 - create an open file record
                 */
                 struct t2fs_record* fileRecord = createFileRecord(TYPEVAL_REGULAR,token, getNewMFTRecord());
-                printFileRecord(fileRecord);
+                // printFileRecord(fileRecord);
                 writeFileRecord(currentBlock, fileRecord);
                 struct openFileRegister* fr = getNewFileRegister(fileRecord);
                 return fr? fr->handle:ERROR;
@@ -200,6 +170,9 @@ FILE2 create2 (char *filename) {
     return ERROR;
 }
 int delete2 (char *filename) {
+
+    if(!initialized)
+        init();
 
     if(isValidFileName(filename) == ERROR){
         return ERROR;
@@ -259,6 +232,9 @@ FILE2 open2 (char *filename) {
         6    - else if it's a file, open it
         7 - else return error
     */
+    if(!initialized)
+        init();
+
     if(isValidFileName(filename) == ERROR){
         return ERROR;
     }
@@ -304,7 +280,8 @@ FILE2 open2 (char *filename) {
 }
 
 int close2 (FILE2 handle){
-
+    if(!initialized)
+        init();
     struct openFileRegister *fileRegister;
 
     fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
@@ -322,7 +299,8 @@ int write2 (FILE2 handle, char *buffer, int size){return NOT_IMPLEMENTED;}
 int truncate2 (FILE2 handle){return NOT_IMPLEMENTED;}
 int seek2 (FILE2 handle, DWORD offset){return NOT_IMPLEMENTED;}
 int mkdir2 (char *pathname) {
-
+    if(!initialized)
+        init();
     if(isValidFileName(pathname) == ERROR){
         return ERROR;
     }
@@ -362,10 +340,8 @@ int mkdir2 (char *pathname) {
                     3 - write record to current directory
                 */
                 struct t2fs_record* fileRecord = createFileRecord(TYPEVAL_DIRETORIO,token, getNewMFTRecord());
-                // printFileRecord(fileRecord);
                 writeFileRecord(currentBlock, fileRecord);
-                struct openFileRegister* fr = getNewFileRegister(fileRecord);
-                return fr? fr->handle:ERROR;
+                return 0;
             } else { //some directory in the path does not exist
                 return ERROR;
             }
@@ -377,7 +353,8 @@ int mkdir2 (char *pathname) {
 }
 
 int rmdir2 (char *pathname){
-
+    if(!initialized)
+        init();
 
     if(isValidFileName(pathname) == ERROR){
         return ERROR;
@@ -431,7 +408,8 @@ int rmdir2 (char *pathname){
 }
 
 DIR2 opendir2 (char *pathname){
-
+    if(!initialized)
+        init();
     if(isValidFileName(pathname) == ERROR){
         return ERROR;
     }
@@ -479,12 +457,14 @@ DIR2 opendir2 (char *pathname){
 }
 
 int readdir2 (DIR2 handle, DIRENT2 *dentry) {
+    if(!initialized)
+        init();
     int currentBlock,
         blockLimit,
         i;
 
     struct openFileRegister* dir = getOpenFileRegisterByHandle(handle);
-    if(!dir){
+    if(!dir || dir->fileRecord->TypeVal != TYPEVAL_DIRETORIO){
         return ERROR;
     }
     struct t2fs_4tupla ** currentMFTRecord = readMFTRecord(dir->fileRecord->MFTNumber);
@@ -492,23 +472,35 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry) {
     
     for(i=0;currentMFTRecord[i]->atributeType == 1;i++) {
         for(currentBlock = currentMFTRecord[i]->logicalBlockNumber, blockLimit = currentMFTRecord[i]->logicalBlockNumber + currentMFTRecord[i]->numberOfContiguosBlocks; 
-            currentBlock < blockLimit; currentBlock++) {
-            // TODO: check for the possibility of having multiple mft records for one file
-            // struct t2fs_record* file = searchBlock(currentBlock, token);
-            // if(file) {
-                
-            // } 
-            // else { //end of dir
-            //     return END_OF_DIR;
-            // }
+            currentBlock < blockLimit; currentBlock++) {            
+            int j, baseSector = blockToSector(currentBlock);
+            for(j = 0; j < SECTORS_PER_BLOCK; j++) {
+                read_sector(baseSector+j,buffer);
+                int k;
+                for(k = 0; k < FILE_RECORDS_PER_SECTOR; k++) {        
+                    struct t2fs_record* fileRecord = readFileRecord(k);
+                    // if valid entry, return                    
+                    if(dir->currentEntry >=  (j*FILE_RECORDS_PER_SECTOR)+k+1)continue;
+                    if(fileRecord->TypeVal == TYPEVAL_DIRETORIO || fileRecord->TypeVal == TYPEVAL_REGULAR) {
+                        dentry->fileType = fileRecord->TypeVal;
+                        dentry->fileSize = fileRecord->bytesFileSize;
+                        strncpy(dentry->name, fileRecord->name, MAX_FILE_NAME_SIZE);
+                        dir->currentEntry =  (j*FILE_RECORDS_PER_SECTOR)+k+1;
+                        return 0;                        
+                    }
+                    // printFileRecord(fileRecord);
+                    free(fileRecord);
+                }
+            }
         }
     }
       
     /*Didn't find or tried to open directory as file*/
-    return ERROR;
+    return END_OF_DIR;
  }
 int closedir2 (DIR2 handle){
-
+    if(!initialized)
+        init();
     struct openFileRegister *fileRegister;
 
     fileRegister = (struct openFileRegister *) getOpenFileRegisterByHandle(handle);
@@ -520,5 +512,3 @@ int closedir2 (DIR2 handle){
 
     return removeFromOpenFiles(handle);
 }
-//return different codes for end of dir, not found in block
-inline int getDirEntry(struct openFileRegister* dir, DIRENT2 *dentry) {}

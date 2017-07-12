@@ -245,7 +245,7 @@ int removeFromOpenFiles(FILE2 handle){
         if(openFiles[i] && openFiles[i]->handle == handle) {
             free(openFiles[i]);
             openFiles[i] = NULL;
-            return SUCCESS;
+            return 0;
         }
     }
     return ERROR;
@@ -263,7 +263,7 @@ int deallocateBlocksFromMFT(int MFT_Number){
         for(blockNumber = record[i]->logicalBlockNumber, limit = blockNumber + record[i]->numberOfContiguosBlocks; blockNumber < limit; blockNumber++){
             if(setBitmap2(blockNumber, FREE) != 0)
                 erro = erro + 1;
-            printf("Limpando os bloco %d do registro %d do MFT, erros: %d\n", blockToSector,MFT_Number, erro);
+            // printf("Limpando os bloco %d do registro %d do MFT, erros: %d\n", blockNumber,MFT_Number, erro);
         }
 
         if(record[i]->atributeType == MFT_ADDITIONAL){
@@ -294,6 +294,6 @@ int setAsFreeMFT(int MFT_Number){
     record[0]->numberOfContiguosBlocks = MFT_FREE;
     writeMFTRecord(record, MFT_Number);
     // printMFTTuple(readMFTRecord(MFT_Number)[0]);
-    return SUCCESS;
+    return 0;
 }
 
